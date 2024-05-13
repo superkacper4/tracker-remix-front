@@ -10,6 +10,7 @@ import { useActionData, useLoaderData } from "@remix-run/react";
 import { Modal } from "~/components/Modal";
 import { Tile } from "~/components/Tile";
 import { graphql } from "graphql/graphql";
+import { BodyStats } from "~/components/BodyStats";
 
 export const meta: MetaFunction = () => {
   return [
@@ -60,6 +61,59 @@ const SendMeal = gql`
   }
 `;
 
+const DeleteExercise = gql`
+  mutation DeleteExercise($id: Int) {
+    deleteExercise(id: $id) {
+      id
+    }
+  }
+`;
+
+const DeleteMeal = gql`
+  mutation DeleteMeal($id: Int) {
+    deleteMeal(id: $id) {
+      id
+    }
+  }
+`;
+
+const EditExercise = gql`
+  mutation EditExercise(
+    $editExerciseId: Int
+    $title: String
+    $time: Int
+    $kcal: Int
+  ) {
+    editExercise(id: $editExerciseId, title: $title, time: $time, kcal: $kcal) {
+      id
+    }
+  }
+`;
+
+const EditMeal = gql`
+  mutation EditMeal($editMealId: Int, $title: String, $kcal: Int) {
+    editMeal(id: $editMealId, title: $title, kcal: $kcal) {
+      id
+    }
+  }
+`;
+
+const EditBodyStats = gql`
+  mutation AddBodyStats($weight: Int, $height: Int) {
+    addBodyStats(weight: $weight, height: $height) {
+      bmi
+    }
+  }
+`;
+
+const ResetBoyStats = gql`
+  mutation ResetBodyStats {
+    resetBodyStats {
+      bmi
+    }
+  }
+`;
+
 export const loader: LoaderFunction = async () => {
   const data = await client.request(GetAllData);
   return json(data);
@@ -71,11 +125,68 @@ export const action: ActionFunction = async ({ request }) => {
   const title = formData.get("title");
   const kcal = formData.get("kcal");
   const time = formData.get("time");
+  const editId = formData.get("id");
 
-  console.log({ title, kcal, time }, request);
+  const exerciseDeleteId = formData.get("deleteExercise");
+  const mealDeleteId = formData.get("deleteMeal");
+
+  const height = formData.get("height");
+  const weight = formData.get("weight");
+
+  const resetBodyStats = formData.get("resetBodyStats");
+
+  if (resetBodyStats) {
+    const res = await client.request(ResetBoyStats);
+
+    return json(res);
+  }
+
+  if (height && weight) {
+    const res = await client.request(EditBodyStats, {
+      weight: Number(weight),
+      height: Number(height),
+    });
+
+    return json(res);
+  }
+
+  if (exerciseDeleteId) {
+    const res = await client.request(DeleteExercise, {
+      id: Number(exerciseDeleteId),
+    });
+
+    return json(res);
+  }
+
+  if (mealDeleteId) {
+    const res = await client.request(DeleteMeal, {
+      id: Number(mealDeleteId),
+    });
+
+    return json(res);
+  }
 
   if (time) {
+    if (editId) {
+      const res = await client.request(EditExercise, {
+        editExerciseId: Number(editId),
+        title,
+        kcal: Number(kcal),
+        time: Number(time),
+      });
+      return json(res);
+    }
     const res = await client.request(SendExercise, {
+      title,
+      kcal: Number(kcal),
+      time: Number(time),
+    });
+    return json(res);
+  }
+
+  if (editId) {
+    const res = await client.request(EditMeal, {
+      editMealId: Number(editId),
       title,
       kcal: Number(kcal),
       time: Number(time),
@@ -93,27 +204,11 @@ export const action: ActionFunction = async ({ request }) => {
 
 export default function Index() {
   const data = useLoaderData();
-  const actionData = useActionData();
-
-  console.log({ actionData });
 
   return (
     <main className="w-full min-h-screen bg-gray-100 flex flex-col items-center gap-4 p-4">
       <h1 className="text-bold text-3xl">Remix.run frontend - Master thesis</h1>
-      <section className="flex flex-col w-full max-w-[600px] items-center rounded p-4 bg-sky-300">
-        <h2 className="text-2xl">Body stats</h2>
-        <section className="w-full max-w-[500px] flex-1">
-          <div className="bg-sky-200 rounded flex flex-wrap p-2">
-            <h3 className="w-full text-center text-xl text-bold">
-              BMI: {data?.bodyStats?.bmi}
-            </h3>
-            <div className="flex w-full justify-between">
-              <p>{data?.bodyStats?.weight} kg</p>
-              <p>{data?.bodyStats?.height} cm</p>
-            </div>
-          </div>
-        </section>
-      </section>
+      <BodyStats bodyStats={data?.bodyStats} />
       <Tile
         colorMain="bg-orange-300"
         colorTile="bg-orange-200"
